@@ -2,6 +2,7 @@
 
 import smtplib
 from email.mime.text import MIMEText
+from validate_email import validate_email
 
 import braintree,json
 from flask import Flask,request
@@ -34,6 +35,26 @@ CORS(app, resources = {r'*':{'origins':origin}})
 
 index = open('index.html').read()
 
+emailapp = smtplib.SMTP('localhost')
+
+def send_receipt(to, name, amount,):
+    body = """%s,
+    
+    Thank you for your participation.  You have been charged $%s.
+
+    If you are receiving this in error or have regrets, please send an email to conorpp94@gmail.com for a refund.
+    
+    Conor
+    https://conorpp.com
+    """ % (name, amount)
+    msg = MIMEText(body)
+    msg['Subject'] = 'Thanks for your participation on conorpp.com'
+    msg['From'] = 'noreply@conorpp.com'
+    msg['To'] = to
+
+    emailapp.sendmail('noreply@conorpp.com', to, msg.as_string())
+
+
 @app.route('/')
 def root():
     return index
@@ -46,32 +67,38 @@ def client_token():
 
 @app.route('/checkout', methods=['POST'])
 def create_purchase():
-    trans = request.json
-    nonce = trans.get('nonce','asdfghjkl')
-    name = trans.get('name', None)
-    if name is None:
-        return json.dumps({'status':'fail', 'errors':['No name supplied']})
-    name = name[0:50]
-    result = braintree.Transaction.sale({
-        'amount':'5.00',
-        'payment_method_nonce': nonce
-        })
-    if result.is_success:
-        return json.dumps({'status':'success', 'name':name})
-    else:
-        return json.dumps({'status':'fail', 'errors': [x.message for x in result.errors.deep_errors]})
+    try:
+        amount = '0.50'
+        trans = request.json
+        nonce = trans.get('nonce','asdfghjkl')
+        name = trans.get('name', None)
+
+        if name is None:
+            return json.dumps({'status':'fail', 'errors':['No name supplied']})
+        name = name[0:50]
+        
+        email = trans.get('email', '')
+        is_valid = validate_email(email)
+
+        if not is_valid:
+            return json.dumps({'status':'fail', 'errors':['Email is invalid']})
+        print 'valid'
+
+        result = braintree.Transaction.sale({
+            'amount':amount,
+            'payment_method_nonce': nonce
+            })
+
+        if result.is_success:
+            send_receipt(email,name,amount)
+            return json.dumps({'status':'success', 'name':name})
+        else:
+            return json.dumps({'status':'fail', 'errors': [x.message for x in result.errors.deep_errors]})
+    except Exception as e:
+        print 'exception: ',e
+
+
 
 if __name__ == '__main__':
-    """
-    msg = MIMEText('\ntest email\n')
-    msg['Subject'] = 'thanks for your purchase'
-    msg['From'] = 'noreply@conorpp.com'
-    msg['To'] = 'conorpp@vt.edu'
-
-    s = smtplib.SMTP('localhost')
-    s.sendmail('noreply@conorpp.com', 'conorpp@vt.edu', msg.as_string())
-
-    print 'send mail?'
-    """
 
     app.run(host='127.0.0.1')

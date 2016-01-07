@@ -5,7 +5,7 @@
 </head>
 
 <body>
-
+    <h1>testing</h1>
 <style>
 
 .myinfo
@@ -27,21 +27,53 @@
 }
 .mybtn
 {
-    font-size: 3em;
-    width: 3em;
 }
 .inithide
 {
     display:none;
 }
+.spinner {
+  width: 40px;
+  height: 40px;
+  background-color: #333;
+
+  margin: 100px auto;
+  -webkit-animation: sk-rotateplane 1.2s infinite ease-in-out;
+  animation: sk-rotateplane 1.2s infinite ease-in-out;
+}
+
+@-webkit-keyframes sk-rotateplane {
+  0% { -webkit-transform: perspective(120px) }
+  50% { -webkit-transform: perspective(120px) rotateY(180deg) }
+  100% { -webkit-transform: perspective(120px) rotateY(180deg)  rotateX(180deg) }
+}
+
+@keyframes sk-rotateplane {
+  0% { 
+    transform: perspective(120px) rotateX(0deg) rotateY(0deg);
+    -webkit-transform: perspective(120px) rotateX(0deg) rotateY(0deg) 
+  } 50% { 
+    transform: perspective(120px) rotateX(-180.1deg) rotateY(0deg);
+    -webkit-transform: perspective(120px) rotateX(-180.1deg) rotateY(0deg) 
+  } 100% { 
+    transform: perspective(120px) rotateX(-180deg) rotateY(-179.9deg);
+    -webkit-transform: perspective(120px) rotateX(-180deg) rotateY(-179.9deg);
+  }
+}
 </style>
 
-<div class="loading">Loading...</div>
+<div class="spinner loading"></div>
 
 <form id="checkout" method="post">
+
     <label for="name" class="inithide">Name</label>
     <input id="name" class="nameinput inithide">
+
+    <label for="email" class="inithide">Email</label>
+    <input id="email" class="emailinput inithide">
+
     <div id="payment-form" class="mar"></div>
+
     <div class="mar inithide">By submitting this, I agree to pay $0.50.</div>
     <input type="submit"  class="submit  mybtn inithide" value="Pay $0.50">
     <div class="error hide"></div>
@@ -95,24 +127,36 @@ var ajaxreq = function(url, method, params, callback)
 
 var showError = function(err)
 {
-    var errdiv = document.querySelector('.error');
-    errdiv.classList.toggle('hide');
-
+    var errdiv = showElement('.error');
     if (err) errdiv.innerHTML = err;
+    return errdiv;
 }
 var hideError = function()
 {
-    var errdiv = document.querySelector('.error');
-    errdiv.classList.toggle('hide');
+    hideElement('.error');
 }
 
 var showReceipt = function(receipt)
 {
     var recdiv = document.querySelector('.receipt');
     recdiv.innerText = receipt;
-    console.log(receipt);
+    return showElement('.receipt');
 }
 
+var showElement = function(ele)
+{
+    ele = document.querySelector(ele);
+    if (ele.classList.contains('hide'))
+        ele.classList.toggle('hide');
+    return ele;
+}
+var hideElement = function(ele)
+{
+    ele = document.querySelector(ele);
+    if (!ele.classList.contains('hide'))
+        ele.classList.toggle('hide');
+    return ele;
+}
 
 ajaxreq(server+'client_token','GET', function(res)
 {
@@ -121,7 +165,7 @@ ajaxreq(server+'client_token','GET', function(res)
     {
         console.log(res);
         var clientToken = res.responseText;
-        document.querySelector('.loading').classList.toggle('hide');
+        hideElement('.loading');
         braintree.setup(clientToken, "dropin", {
             container: "payment-form",
             hostedFields: {
@@ -131,6 +175,7 @@ ajaxreq(server+'client_token','GET', function(res)
             },
             onReady: function(integration)
             {
+                console.log('ready');
                 while(document.querySelector('.inithide'))
                 {
                     document.querySelector('.inithide').classList.toggle('inithide');
@@ -141,26 +186,34 @@ ajaxreq(server+'client_token','GET', function(res)
             {
                 var name = document.querySelector('.nameinput').value;
                 if (name) name = name.substring(0,50);
-                console.log("name",name);
-                ajaxreq(server+'checkout','POST', {name:name, nonce:tran['nonce']}, function(res)
+                var email = document.querySelector('.emailinput').value;
+                if (email) email = email.substring(0,256);
+                
+                hideElement('#checkout');
+                showElement('.loading');
+
+                ajaxreq(server+'checkout','POST', {email: email, name:name, nonce:tran['nonce']}, function(res)
                 {
                     if (res)
                     {
                         res = JSON.parse(res.responseText);
+                        console.log(res);
                         if (res.status == 'success')
                         {
                             checkout.teardown(function()
                             {
                                 checkout = null;
-                                document.querySelector('#checkout').classList.toggle('hide');
-                                console.log('success here is yo receipt');
+                                hideElement('#checkout');
+                                hideElement('.loading');
                                 showReceipt('Transaction was successful.  You will be emailed a receipt.');
                             });
                         }
                         else
                         {
-                            console.log('fail cuz ', res.errors[0]);
+                            console.log('fail ', res.errors[0]);
                             showError(res.errors[0]);
+                            showElement('#checkout');
+                            hideElement('.loading');
                         }
                     }
                 });
