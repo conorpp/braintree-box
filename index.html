@@ -84,7 +84,7 @@
 <script src="https://js.braintreegateway.com/v2/braintree.js"></script>
 <script>
 
-var server = window.location.href;
+var server = window.location.origin + '/';
 
 var ajaxreq = function(url, method, params, callback)
 {
@@ -158,12 +158,11 @@ var hideElement = function(ele)
     return ele;
 }
 
-ajaxreq(server+'client_token','GET', function(res)
+ajaxreq(server+'b/client_token','GET', function(res)
 {
     var checkout;
     if (res)
     {
-        console.log(res);
         var clientToken = res.responseText;
         hideElement('.loading');
         braintree.setup(clientToken, "dropin", {
@@ -175,7 +174,6 @@ ajaxreq(server+'client_token','GET', function(res)
             },
             onReady: function(integration)
             {
-                console.log('ready');
                 while(document.querySelector('.inithide'))
                 {
                     document.querySelector('.inithide').classList.toggle('inithide');
@@ -192,12 +190,11 @@ ajaxreq(server+'client_token','GET', function(res)
                 hideElement('#checkout');
                 showElement('.loading');
 
-                ajaxreq(server+'checkout','POST', {email: email, name:name, nonce:tran['nonce']}, function(res)
+                ajaxreq(server+'b/checkout','POST', {email: email, name:name, nonce:tran['nonce']}, function(res)
                 {
                     if (res)
                     {
                         res = JSON.parse(res.responseText);
-                        console.log(res);
                         if (res.status == 'success')
                         {
                             checkout.teardown(function()
@@ -210,7 +207,6 @@ ajaxreq(server+'client_token','GET', function(res)
                         }
                         else
                         {
-                            console.log('fail ', res.errors[0]);
                             showError(res.errors[0]);
                             showElement('#checkout');
                             hideElement('.loading');
