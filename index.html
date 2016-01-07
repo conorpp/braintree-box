@@ -1,0 +1,174 @@
+<html>
+
+<head>
+    <title>Braintree Box</title>
+</head>
+
+<body>
+
+<style>
+
+.myinfo
+{
+    width: 100%;
+    font-size: 2em;
+}
+.error
+{
+    color: red;
+}
+.hide
+{
+    display: none;
+}
+.mar
+{
+    margin-top: 2em;
+}
+.mybtn
+{
+    font-size: 3em;
+    width: 3em;
+}
+.inithide
+{
+    display:none;
+}
+</style>
+
+<div class="loading">Loading...</div>
+
+<form id="checkout" method="post">
+    <label for="name" class="inithide">Name</label>
+    <input id="name" class="nameinput inithide">
+    <div id="payment-form" class="mar"></div>
+    <div class="mar inithide">By submitting this, I agree to pay $0.50.</div>
+    <input type="submit"  class="submit  mybtn inithide" value="Pay $0.50">
+    <div class="error hide"></div>
+</form>
+
+<div class="receipt"></div>
+
+<script src="https://js.braintreegateway.com/v2/braintree.js"></script>
+<script>
+
+var server = window.location.href;
+
+var ajaxreq = function(url, method, params, callback)
+{
+    var req;
+    callback = callback || params;
+
+    if (window.XMLHttpRequest) 
+    {
+        req = new XMLHttpRequest();
+    }
+    else 
+    {
+        req = new ActiveXObject("Microsoft.XMLHTTP");
+    }
+    req.onreadystatechange = function() 
+    {
+        if (req.readyState == XMLHttpRequest.DONE ) {
+            if(req.status == 200)
+            {
+                callback(req);
+            }
+            else 
+            {
+                console.log("warning response code: ", req.status);
+                callback(null);
+            }
+        }
+    }
+    req.open(method, url, true);
+    if (method.toLowerCase() == 'post' && params !== null && typeof params === 'object')
+    {
+        req.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
+        req.send(JSON.stringify(params));
+    }
+    else
+    {
+        req.send();
+    }
+};
+
+var showError = function(err)
+{
+    var errdiv = document.querySelector('.error');
+    errdiv.classList.toggle('hide');
+
+    if (err) errdiv.innerHTML = err;
+}
+var hideError = function()
+{
+    var errdiv = document.querySelector('.error');
+    errdiv.classList.toggle('hide');
+}
+
+var showReceipt = function(receipt)
+{
+    var recdiv = document.querySelector('.receipt');
+    recdiv.innerText = receipt;
+    console.log(receipt);
+}
+
+
+ajaxreq(server+'client_token','GET', function(res)
+{
+    var checkout;
+    if (res)
+    {
+        console.log(res);
+        var clientToken = res.responseText;
+        document.querySelector('.loading').classList.toggle('hide');
+        braintree.setup(clientToken, "dropin", {
+            container: "payment-form",
+            hostedFields: {
+                name: {
+                    selector:'#name'
+                }
+            },
+            onReady: function(integration)
+            {
+                while(document.querySelector('.inithide'))
+                {
+                    document.querySelector('.inithide').classList.toggle('inithide');
+                }
+                checkout = integration;
+            },
+            onPaymentMethodReceived: function(tran)
+            {
+                var name = document.querySelector('.nameinput').value;
+                if (name) name = name.substring(0,50);
+                console.log("name",name);
+                ajaxreq(server+'checkout','POST', {name:name, nonce:tran['nonce']}, function(res)
+                {
+                    if (res)
+                    {
+                        res = JSON.parse(res.responseText);
+                        if (res.status == 'success')
+                        {
+                            checkout.teardown(function()
+                            {
+                                checkout = null;
+                                document.querySelector('#checkout').classList.toggle('hide');
+                                console.log('success here is yo receipt');
+                                showReceipt('Transaction was successful.  You will be emailed a receipt.');
+                            });
+                        }
+                        else
+                        {
+                            console.log('fail cuz ', res.errors[0]);
+                            showError(res.errors[0]);
+                        }
+                    }
+                });
+            }
+        });
+    }
+});
+
+</script>
+</body>
+</html>
