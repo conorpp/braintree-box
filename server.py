@@ -8,11 +8,19 @@ import braintree,json
 from flask import Flask,request
 from flask.ext.cors import CORS
 
-conf = json.loads(open('config.json','r').read())
+import sys
+
+if len(sys.argv) < 2:
+    print 'usage: %s <config> [debug]' % sys.argv[0]
+    sys.exit(1)
+
+conf = json.loads(open(sys.argv[1],'r').read())
 
 origin = None
+debug = False
 
 if conf['environment'] == 'sandbox':
+    debug = True
     braintree.Configuration.configure(braintree.Environment.Sandbox,
                                       merchant_id=conf['sandbox-merchant-id'],
                                       public_key=conf['sandbox-pubkey'],
@@ -21,7 +29,7 @@ if conf['environment'] == 'sandbox':
     origin = conf['sandbox-origin']
 
 else:
-    braintree.Configuration.configure(braintree.Environment.Sandbox,
+    braintree.Configuration.configure(braintree.Environment.Production,
                                       merchant_id=conf['merchant-id'],
                                       public_key=conf['pubkey'],
                                       private_key=conf['privkey'],
@@ -33,12 +41,12 @@ app = Flask(__name__, static_url_path='')
 
 CORS(app, resources = {r'*':{'origins':origin}})
 
-index = open('index.html').read()
 
-emailapp = smtplib.SMTP('smtp.gmail.com',587)
-emailapp.ehlo()
-emailapp.starttls()
-emailapp.login(conf['gmail-username'], conf['gmail-password'])
+if not debug:
+    emailapp = smtplib.SMTP('smtp.gmail.com',587)
+    emailapp.ehlo()
+    emailapp.starttls()
+    emailapp.login(conf['gmail-username'], conf['gmail-password'])
 
 def send_receipt(to, name, amount,):
     body = """%s,
@@ -56,11 +64,12 @@ https://conorpp.com
     msg['From'] = 'noreply@conorpp.com'
     msg['To'] = to
 
-    emailapp.sendmail('noreply@conorpp.com', to, msg.as_string())
+    if not debug: emailapp.sendmail('noreply@conorpp.com', to, msg.as_string())
 
 
 @app.route('/')
 def root():
+    index = open('index.html').read()
     return index
 
 
@@ -71,38 +80,41 @@ def client_token():
 
 @app.route('/b/checkout', methods=['POST'])
 def create_purchase():
-    try:
-        amount = '0.50'
-        trans = request.json
-        nonce = trans.get('nonce','asdfghjkl')
-        name = trans.get('name', None)
+    amount = '0.50'
+    trans = request.json
+    nonce = trans.get('nonce','asdfghjkl')
+    name = trans.get('name', None)
 
-        if name is None:
-            return json.dumps({'status':'fail', 'errors':['No name supplied']})
-        name = name[0:50]
-        
-        email = trans.get('email', '')
-        is_valid = validate_email(email)
+    if name is None:
+        return json.dumps({'status':'fail', 'errors':['No name supplied']})
+    name = name[0:50]
+    
+    email = trans.get('email', '')
+    is_valid = validate_email(email)
 
-        if not is_valid:
-            return json.dumps({'status':'fail', 'errors':['Email is invalid']})
-        print 'valid'
+    if not is_valid:
+        return json.dumps({'status':'fail', 'errors':['Email is invalid']})
 
-        result = braintree.Transaction.sale({
-            'amount':amount,
-            'payment_method_nonce': nonce
-            })
+    result = braintree.Transaction.sale({
+        'amount':amount,
+        'payment_method_nonce': nonce,
+        options: {
+                'submit_for_settlement':True
+            }
+        })
 
-        if result.is_success:
-            send_receipt(email,name,amount)
-            return json.dumps({'status':'success', 'name':name})
-        else:
-            return json.dumps({'status':'fail', 'errors': [x.message for x in result.errors.deep_errors]})
-    except Exception as e:
-        print 'exception: ',e
+    if result.is_success:
+        send_receipt(email,name,amount)
+        return json.dumps({'status':'success', 'name':name})
+    else:
+        if len(result.errors.deep_errors) == 0:
+            return json.dumps({'status':'fail', 'errors': ['Payment method was not successful']})
+
+        return json.dumps({'status':'fail', 'errors': [x.message for x in result.errors.deep_errors]})
 
 
 
 if __name__ == '__main__':
-
+    if len(sys.argv) > 2 and sys.argv[2] == 'debug':
+        app.debug = True
     app.run(host='127.0.0.1')
