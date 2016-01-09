@@ -5,7 +5,6 @@
 </head>
 
 <body>
-    <h1>testing</h1>
 <style>
 
 .myinfo
@@ -66,16 +65,28 @@
 
 <form id="checkout" method="post">
 
-    <label for="name" class="inithide">Name</label>
-    <input id="name" class="nameinput inithide">
 
-    <label for="email" class="inithide">Email</label>
-    <input id="email" class="emailinput inithide">
+
+    <div>
+        <label for="name" class="inithide">Name</label>
+        <input id="name" class="nameinput inithide">
+    </div>
+
+    <div>
+        <label for="email" class="inithide">Email</label>
+        <input id="email" class="emailinput inithide">
+    </div>
+
+    <div class="mar">
+        <a class="inithide" href="https://www.braintreegateway.com/merchants/39fdtq7yghwccwkf/verified" target="_blank">
+            <img src="https://s3.amazonaws.com/braintree-badges/braintree-badge-wide-dark.png" width="280px" height ="44px" border="0"/>
+        </a>
+    </div>
 
     <div id="payment-form" class="mar"></div>
 
-    <div class="mar inithide">By submitting this, I agree to pay $0.50.</div>
-    <input type="submit"  class="submit  mybtn inithide" value="Pay $0.50">
+    <div class="mar inithide">By submitting this, I agree to pay $0.10.</div>
+    <input type="submit"  class="submit  mybtn inithide" value="Pay $0.10">
     <div class="error hide"></div>
 </form>
 
@@ -166,12 +177,7 @@ ajaxreq(server+'b/client_token','GET', function(res)
         var clientToken = res.responseText;
         hideElement('.loading');
         braintree.setup(clientToken, "dropin", {
-            container: "payment-form",
-            hostedFields: {
-                name: {
-                    selector:'#name'
-                }
-            },
+                container: "payment-form",
             onReady: function(integration)
             {
                 while(document.querySelector('.inithide'))
@@ -186,11 +192,13 @@ ajaxreq(server+'b/client_token','GET', function(res)
                 if (name) name = name.substring(0,50);
                 var email = document.querySelector('.emailinput').value;
                 if (email) email = email.substring(0,256);
+
+                console.log(tran);
                 
                 hideElement('#checkout');
                 showElement('.loading');
 
-                ajaxreq(server+'b/checkout','POST', {email: email, name:name, nonce:tran['nonce']}, function(res)
+                ajaxreq(server+'b/checkout_10c','POST', {email: email, name:name, nonce:tran['nonce']}, function(res)
                 {
                     if (res)
                     {

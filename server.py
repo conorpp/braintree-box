@@ -78,10 +78,12 @@ def client_token():
     return braintree.ClientToken.generate();
 
 
-@app.route('/b/checkout', methods=['POST'])
-def create_purchase():
-    amount = '0.50'
-    trans = request.json
+@app.route('/b/checkout_10c', methods=['POST'])
+def checkout_top():
+    create_purchase(request, '0.10')
+
+def create_purchase(req, amount):
+    trans = req.json
     nonce = trans.get('nonce','asdfghjkl')
     name = trans.get('name', None)
 
@@ -98,7 +100,7 @@ def create_purchase():
     result = braintree.Transaction.sale({
         'amount':amount,
         'payment_method_nonce': nonce,
-        options: {
+        'options': {
                 'submit_for_settlement':True
             }
         })
@@ -117,4 +119,6 @@ def create_purchase():
 if __name__ == '__main__':
     if len(sys.argv) > 2 and sys.argv[2] == 'debug':
         app.debug = True
-    app.run(host='127.0.0.1')
+        app.run(host='0.0.0.0')
+    else:
+        app.run(host='127.0.0.1')
