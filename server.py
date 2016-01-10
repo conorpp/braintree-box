@@ -18,6 +18,7 @@ conf = json.loads(open(sys.argv[1],'r').read())
 
 origin = None
 debug = False
+emailapp = None
 
 if conf['environment'] == 'sandbox':
     debug = True
@@ -41,12 +42,14 @@ app = Flask(__name__, static_url_path='')
 
 CORS(app, resources = {r'*':{'origins':origin}})
 
-
-if not debug:
+def connect_to_email():
     emailapp = smtplib.SMTP('smtp.gmail.com',587)
     emailapp.ehlo()
     emailapp.starttls()
     emailapp.login(conf['gmail-username'], conf['gmail-password'])
+
+if not debug:
+    connect_to_email()
 
 def send_receipt(to, name, amount,):
     body = """%s,
@@ -64,7 +67,13 @@ https://conorpp.com
     msg['From'] = 'noreply@conorpp.com'
     msg['To'] = to
 
-    if not debug: emailapp.sendmail('noreply@conorpp.com', to, msg.as_string())
+    if not debug: 
+        try:
+            emailapp.sendmail('noreply@conorpp.com', to, msg.as_string())
+        except:
+            connect_to_email()
+            emailapp.sendmail('noreply@conorpp.com', to, msg.as_string())
+
 
 
 @app.route('/')
