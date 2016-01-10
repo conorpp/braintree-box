@@ -17,7 +17,6 @@ if len(sys.argv) < 2:
 conf = json.loads(open(sys.argv[1],'r').read())
 
 origin = None
-debug = False
 emailapp = None
 
 if conf['environment'] == 'sandbox':
@@ -43,15 +42,15 @@ app = Flask(__name__, static_url_path='')
 CORS(app, resources = {r'*':{'origins':origin}})
 
 def connect_to_email():
-    emailapp = smtplib.SMTP('smtp.gmail.com',587)
-    emailapp.ehlo()
-    emailapp.starttls()
-    emailapp.login(conf['gmail-username'], conf['gmail-password'])
+    s = smtplib.SMTP('smtp.gmail.com',587)
+    s.ehlo()
+    s.starttls()
+    s.login(conf['gmail-username'], conf['gmail-password'])
+    return s
 
-if not debug:
-    connect_to_email()
 
 def send_receipt(to, name, amount,):
+    global emailapp
     body = """%s,
 
 Thank you for your participation.  You have been charged $%s.
@@ -66,12 +65,11 @@ https://conorpp.com
     msg['Subject'] = 'Thanks for your participation on conorpp.com'
     msg['From'] = 'noreply@conorpp.com'
     msg['To'] = to
-
-    if not debug: 
+    if not app.debug: 
         try:
             emailapp.sendmail('noreply@conorpp.com', to, msg.as_string())
         except:
-            connect_to_email()
+            emailapp = connect_to_email()
             emailapp.sendmail('noreply@conorpp.com', to, msg.as_string())
 
 
@@ -124,10 +122,11 @@ def create_purchase(req, amount):
         return json.dumps({'status':'fail', 'errors': [x.message for x in result.errors.deep_errors]})
 
 
-
 if __name__ == '__main__':
     if len(sys.argv) > 2 and sys.argv[2] == 'debug':
         app.debug = True
+        print 'debug running'
         app.run(host='0.0.0.0')
     else:
+        emailapp = connect_to_email()
         app.run(host='127.0.0.1')
