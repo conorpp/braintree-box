@@ -89,7 +89,7 @@ def client_token():
 
 @app.route('/b/checkout_10c', methods=['POST'])
 def checkout_top():
-    create_purchase(request, '0.10')
+    return create_purchase(request, '0.10')
 
 def create_purchase(req, amount):
     trans = req.json
