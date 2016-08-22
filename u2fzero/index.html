@@ -1,0 +1,255 @@
+<html>
+
+<head>
+    <title>Braintree Box</title>
+</head>
+
+<body>
+<style>
+
+.myinfo
+{
+    width: 100%;
+    font-size: 2em;
+}
+.error
+{
+    color: red;
+}
+.hide
+{
+    display: none;
+}
+.mar
+{
+    margin-top: 2em;
+}
+.mybtn
+{
+}
+.inithide
+{
+    display:none;
+}
+.spinner {
+  width: 40px;
+  height: 40px;
+  background-color: #333;
+
+  margin: 100px auto;
+  -webkit-animation: sk-rotateplane 1.2s infinite ease-in-out;
+  animation: sk-rotateplane 1.2s infinite ease-in-out;
+}
+
+@-webkit-keyframes sk-rotateplane {
+  0% { -webkit-transform: perspective(120px) }
+  50% { -webkit-transform: perspective(120px) rotateY(180deg) }
+  100% { -webkit-transform: perspective(120px) rotateY(180deg)  rotateX(180deg) }
+}
+
+@keyframes sk-rotateplane {
+  0% { 
+    transform: perspective(120px) rotateX(0deg) rotateY(0deg);
+    -webkit-transform: perspective(120px) rotateX(0deg) rotateY(0deg) 
+  } 50% { 
+    transform: perspective(120px) rotateX(-180.1deg) rotateY(0deg);
+    -webkit-transform: perspective(120px) rotateX(-180.1deg) rotateY(0deg) 
+  } 100% { 
+    transform: perspective(120px) rotateX(-180deg) rotateY(-179.9deg);
+    -webkit-transform: perspective(120px) rotateX(-180deg) rotateY(-179.9deg);
+  }
+}
+</style>
+
+<div class="spinner loading"></div>
+
+<form id="checkout" method="post">
+
+
+
+    <div>
+        <label for="name" class="inithide">Name</label>
+        <input id="name" class="nameinput inithide">
+    </div>
+
+    <div>
+        <label for="email" class="inithide">Email</label>
+        <input id="email" class="emailinput inithide">
+    </div>
+
+    <div class="">
+        <label for="amount" class="inithide">Amount</label>
+        <input id="amount" class="amountinput inithide">
+    </div>
+
+
+    <p id="cost"  class="inithide">
+        Enter amount that is multiple of $5.5.  For example, 3 U2F tokens would be $16.5.
+    </p>
+
+    <div class="mar">
+        <a class="inithide" href="https://www.braintreegateway.com/merchants/39fdtq7yghwccwkf/verified" target="_blank">
+            <img src="https://s3.amazonaws.com/braintree-badges/braintree-badge-wide-dark.png" width="280px" height ="44px" border="0"/>
+        </a>
+    </div>
+
+    <div id="payment-form" class="mar"></div>
+
+    <div class="mar inithide">By submitting this, I agree to pay the amount I specified.</div>
+    <input type="submit"  class="submit  mybtn inithide" value="Submit payment">
+    <div class="error hide"></div>
+</form>
+
+<div class="receipt"></div>
+
+<script src="https://js.braintreegateway.com/v2/braintree.js"></script>
+<script>
+
+var server = window.location.origin + '/';
+
+var ajaxreq = function(url, method, params, callback)
+{
+    var req;
+    callback = callback || params;
+
+    if (window.XMLHttpRequest) 
+    {
+        req = new XMLHttpRequest();
+    }
+    else 
+    {
+        req = new ActiveXObject("Microsoft.XMLHTTP");
+    }
+    req.onreadystatechange = function() 
+    {
+        if (req.readyState == XMLHttpRequest.DONE ) {
+            if(req.status == 200)
+            {
+                callback(req);
+            }
+            else 
+            {
+                console.log("warning response code: ", req.status);
+                callback(null);
+            }
+        }
+    }
+    req.open(method, url, true);
+    if (method.toLowerCase() == 'post' && params !== null && typeof params === 'object')
+    {
+        req.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
+        req.send(JSON.stringify(params));
+    }
+    else
+    {
+        req.send();
+    }
+};
+
+var showError = function(err)
+{
+    var errdiv = showElement('.error');
+    if (err) errdiv.innerHTML = err;
+    return errdiv;
+}
+var hideError = function()
+{
+    hideElement('.error');
+}
+
+var showReceipt = function(receipt)
+{
+    var recdiv = document.querySelector('.receipt');
+    recdiv.innerText = receipt;
+    return showElement('.receipt');
+}
+
+var showElement = function(ele)
+{
+    ele = document.querySelector(ele);
+    if (ele.classList.contains('hide'))
+        ele.classList.toggle('hide');
+    return ele;
+}
+var hideElement = function(ele)
+{
+    ele = document.querySelector(ele);
+    if (!ele.classList.contains('hide'))
+        ele.classList.toggle('hide');
+    return ele;
+}
+
+ajaxreq(server+'b/client_token','GET', function(res)
+{
+    var checkout;
+    if (res)
+    {
+        var clientToken = res.responseText;
+        hideElement('.loading');
+        braintree.setup(clientToken, "dropin", {
+                container: "payment-form",
+            onReady: function(integration)
+            {
+                while(document.querySelector('.inithide'))
+                {
+                    document.querySelector('.inithide').classList.toggle('inithide');
+                }
+                checkout = integration;
+            },
+            onPaymentMethodReceived: function(tran)
+            {
+                var name = document.querySelector('.nameinput').value;
+                if (name) name = name.substring(0,50);
+                var email = document.querySelector('.emailinput').value;
+                if (email) email = email.substring(0,256);
+                var amount = document.querySelector('.amountinput').value;
+                if (amount) amount = amount.substring(0,10);
+
+                amount = parseFloat(amount);
+                if (!amount)
+                {
+                    console.log('client input bad: ',amount);
+                    showError('Invalid input');
+                    return;
+                }
+
+                console.log(tran);
+                
+                hideElement('#checkout');
+                showElement('.loading');
+
+                var data = {email: email, name:name, nonce:tran['nonce'], amount: amount};
+
+                console.log('data:',data);
+
+                ajaxreq(server+'b/checkout_u2f','POST', data, function(res)
+                {
+                    if (res)
+                    {
+                        res = JSON.parse(res.responseText);
+                        if (res.status == 'success')
+                        {
+                            checkout.teardown(function()
+                            {
+                                checkout = null;
+                                hideElement('#checkout');
+                                hideElement('.loading');
+                                showReceipt('Transaction was successful.  You will be emailed a receipt.');
+                            });
+                        }
+                        else
+                        {
+                            showError(res.errors[0]);
+                            showElement('#checkout');
+                            hideElement('.loading');
+                        }
+                    }
+                });
+            }
+        });
+    }
+});
+
+</script>
+</body>
+</html>

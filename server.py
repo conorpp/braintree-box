@@ -49,18 +49,20 @@ def connect_to_email():
     return s
 
 
-def send_receipt(to, name, amount,):
+def send_receipt(to, name, amount, extra_receipt=''):
     global emailapp
     body = """%s,
 
-Thank you for your participation.  You have been charged $%s.
+Thank you for your participation.  Here is your receipt:
+
+You have been charged $%s by ConorCo LLC.  %s
 
 If you are receiving this in error or you have regrets, please send an email to conorpp94@gmail.com for a refund.
 
 Best,
 Conor
-https://conorpp.com
-""" % (name, amount)
+https://conorpp.com/
+""" % (name, str(amount), extra_receipt)
     msg = MIMEText(body)
     msg['Subject'] = 'Thanks for your participation on conorpp.com'
     msg['From'] = 'noreply@conorpp.com'
@@ -89,7 +91,31 @@ def client_token():
 def checkout_top():
     return create_purchase(request, '0.10')
 
-def create_purchase(req, amount):
+@app.route('/b/checkout_u2f', methods=['POST'])
+def checkout_other():
+    u2f_price = 5.5
+    try:
+        print request.get_json()
+        amt = float(request.get_json()['amount'])
+        print amt
+        assert(amt > 0.01 and amt < 1000)
+
+        rem = int(amt/u2f_price)
+        diff = amt / u2f_price
+
+        if (diff - rem > 0.01) or (rem - diff > 0.01):
+            return json.dumps({'status':'fail', 'errors': ['Amount must be a multiple of $5.5 (price of a U2F Zero).']})
+
+        reason = 'This is for the purchase of %d U2F Zero tokens.  The tokens must be picked up from Conor himself.' % rem
+
+        return create_purchase(request, str(amt), reason)
+
+    except Exception as e:
+        print e
+        return json.dumps({'status':'fail', 'errors': ['Invalid input']})
+
+
+def create_purchase(req, amount, reason=''):
     trans = req.json
     nonce = trans.get('nonce','asdfghjkl')
     name = trans.get('name', None)
@@ -108,18 +134,19 @@ def create_purchase(req, amount):
         'amount':amount,
         'payment_method_nonce': nonce,
         'options': {
-                'submit_for_settlement':True
+                'submit_for_settlement':False
             }
         })
 
     if result.is_success:
-        send_receipt(email,name,amount)
+        send_receipt(email,name,amount,reason)
         return json.dumps({'status':'success', 'name':name})
     else:
         if len(result.errors.deep_errors) == 0:
             return json.dumps({'status':'fail', 'errors': ['Payment method was not successful']})
 
         return json.dumps({'status':'fail', 'errors': [x.message for x in result.errors.deep_errors]})
+
 
 
 if __name__ == '__main__':
