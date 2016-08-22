@@ -57,22 +57,22 @@ Thank you for your participation.  Here is your receipt:
 
 You have been charged $%s by ConorCo LLC.  %s
 
-If you are receiving this in error or you have regrets, please send an email to conorpp94@gmail.com for a refund.
+If you are receiving this in error or have other issues, please reply to this email (support@conorco.com).
 
 Best,
 Conor
 https://conorpp.com/
 """ % (name, str(amount), extra_receipt)
     msg = MIMEText(body)
-    msg['Subject'] = 'Thanks for your participation on conorpp.com'
-    msg['From'] = 'noreply@conorpp.com'
+    msg['Subject'] = 'Thanks for your transaction'
+    msg['From'] = 'support@conorco.com'
     msg['To'] = to
     if not app.debug: 
         try:
-            emailapp.sendmail('noreply@conorpp.com', to, msg.as_string())
+            emailapp.sendmail('support@conorco.com', to, msg.as_string())
         except:
             emailapp = connect_to_email()
-            emailapp.sendmail('noreply@conorpp.com', to, msg.as_string())
+            emailapp.sendmail('support@conorco.com', to, msg.as_string())
 
 
 
